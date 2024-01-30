@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OTOMASI RUMAH MENGGUNAKAN ESP 8266 BERBASIS WEBSITEb</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.1.2/socket.io.js"></script>
+    <style>
+      body{
+        background: linear-gradient(to bottom right, blueviolet, aqua);
+        height: 98vh;
+      }
+      h1{
+        text-align: center;
+      }
+      .all-container{
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        padding: 16px;
+        text-align: center;
+        border-radius: 10px;
+        gap: 70px;
+      }
+      .container-saklar{
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.5);
+        padding: 16px;
+        text-align: center;
+        background-color: #00000056;
+        border-radius: 10px;
+        width: 30%;
+        gap: 30px;
+      }
+      .button-container {
+        box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.5);
+        padding: 16px;
+        text-align: center;
+        background-color: #ffffff;
+        border-radius: 10px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .button-container p {
+        margin-right: 10px;
+      }
+      
+    
+
+      @media screen and (max-width:760px) {
+        .container-saklar{
+          width: 100%;
+        }
+      }
+
+      .status-indicator {
+        margin-left: 0px;
+        font-weight: bold;
+      }
+
+      .button-container button {
+        border: 0px solid black;
+        padding: 5px;
+        margin-left: 10px;
+        margin-right: 15px;
+        margin-bottom: 10px;
+        margin-top: 10px;
+        width: 100px;
+        height: 50px;
+        text-align: center;
+        font-weight: bold;
+        color: #fff;
+        cursor: pointer;
+        border-radius: 10px;
+      }
+      .logo{
+        width: 200px;
+        display:block;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      label{
+        font-weight: bold;
+        font-size: large;
+      }
+      h1{
+        color: white;
+        text-shadow: 2px 3px 5px  rgba(0, 0, 0, 0.5);
+      }
+    </style>
+  </head>
+  <body>
+    <img src="./asset/logo.png" class="logo" />
+    <h1>OTOMASI RUMAH MENGGUNAKAN ESP 8266 BERBASIS WEBSITE</h1>
+    <div class="all-container">
+      <div class="container-saklar">
+        <div class="button-container">
+          <label for="relay1">RELAY 1</label>
+          <button id="1-button" onclick="toggleRelay(1)">Wait..</button>
+          <p>Status: <span id="relay_status_1" class="status-indicator"></span>
+          </p>
+        </div>
+        <div class="button-container">
+          <label for="relay2">RELAY 2</label>
+          <button id="2-button" onclick="toggleRelay(2)">Wait..</button>
+          <p>Status: <span id="relay_status_2" class="status-indicator"></span>
+          </p>
+        </div>
+        <div class="button-container">
+          <label for="relay3">RELAY 3</label>
+          <button id="3-button" onclick="toggleRelay(3)">Wait..</button>
+          <p>Status: <span id="relay_status_3" class="status-indicator"></span>
+          </p>
+        </div>
+        <div class="button-container">
+          <label for="relay4">RELAY 4</label>
+          <button id="4-button" onclick="toggleRelay(4)">Wait..</button>
+          <p>Status: <span id="relay_status_4" class="status-indicator"></span>
+          </p>
+        </div>
+      </div>
+     </div>
+    <script>
+      const socket = io.connect('http://localhost:5000');
+      const topicToRelayId = {};
+      document.addEventListener('DOMContentLoaded', () => {
+        socket.emit('get_initial_relay_status');
+      });
+      socket.on('initial_relay_status', function(initialStatus) {
+        console.log(initialStatus);
+        for (var key in initialStatus) {
+          if (initialStatus.hasOwnProperty(key)) {
+            var relayNumber = key.split('/')[3];
+            var elementId = 'relay_status_' + relayNumber;
+            const button = document.getElementById(`${relayNumber}-button`);
+            if (button) {
+              button.innerText = (initialStatus[key] == '1') ? 'Turn OFF' : 'Turn ON';
+              button.style.backgroundColor = (initialStatus[key] == '1') ? 'red' : 'green';
+              button.value = (initialStatus[key] == '1') ? 'off' : 'on';
+            }
+            document.getElementById(elementId).innerHTML = (initialStatus[key] === '1') ? 'OFF' : 'ON';
+          }
+        }
+      });
+      for (let i = 1; i <= 4; i++) {
+        const topic = `/relay/status/${i}`;
+        const relayId = `relay_status_${i}`;
+        topicToRelayId[topic] = relayId;
+        const button = document.getElementById(`${i}-button`);
+        socket.on(topic, function(data) {
+          if (button) {
+            button.innerText = (data == '1') ? 'Turn OFF' : 'Turn ON';
+            button.style.backgroundColor = (data == '1') ? 'red' : 'green';
+            button.value = (data == '1') ? 'off' : 'on';
+          }
+          document.getElementById(relayId).innerHTML = (data == '1') ? 'OFF' : 'ON';
+        });
+      }
+      async function toggleRelay(relayId) {
+        try {
+          const button = document.getElementById(`${relayId}-button`);
+          const newStatus = button.value;
+          button.innerText = 'Wait';
+          button.style.backgroundColor = 'black';
+          const response = await fetch(`http://127.0.0.1:5000/api/relay/${relayId}/toggle`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              status: newStatus
+            }),
+          });
+          if (response.ok) {
+            console.log(`Relay ${relayId} ${newStatus}ed successfully.`);
+            getRelayHistory(currentPage);
+          } else {
+            console.error(`Failed to toggle relay ${relayId}.`);
+          }
+        } catch (error) {
+          console.error('An error occurred while toggling relay:', error);
+        }
+      }
+      document.addEventListener('DOMContentLoaded', () => {
+        getRelayHistory(currentPage);
+      });
+    </script>
+  </body>
+</html>
